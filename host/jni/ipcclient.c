@@ -1,10 +1,11 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <string.h>
+#include "ipcclient.h"
 
 static const char ipc_addr[] = "/data/data/com.leapmotion.leapdaemon/Leap Service";
 
-static int ipcclient_connect() {
+int ipcclient_connect() {
   struct sockaddr_un addr;
 
   int fd = socket(PF_LOCAL, SOCK_STREAM, 0);
@@ -31,11 +32,11 @@ static int ipcclient_connect() {
   return fd;
 }
 
-static int ipcclient_write(int fd, const void* pBuf, size_t nBytes) {
+int ipcclient_write(int fd, const void* pBuf, size_t nBytes) {
   return (nBytes == send(fd, pBuf, nBytes, MSG_NOSIGNAL));
 }
 
-static size_t ipcclient_read(int fd, void* pBuf, size_t nBytes) {
+size_t ipcclient_read(int fd, void* pBuf, size_t nBytes) {
   return recv(fd, pBuf, nBytes, MSG_NOSIGNAL);
 }
 

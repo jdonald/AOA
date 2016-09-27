@@ -31,21 +31,20 @@
 #include "ipcclient.h"
 
 struct usb_device *sDevice = NULL;
+int ipcclient_fd;
 
 static void* read_thread(void* arg) {
     int endpoint = (int)(uintptr_t)arg;
     int ret = 0;
 
     while (sDevice && ret >= 0) {
-        char    buffer[16384];
+        char buffer[16384];
 
         ret = usb_device_bulk_transfer(sDevice, endpoint, buffer, sizeof(buffer), 1000);
         if (ret < 0 && errno == ETIMEDOUT)
             ret = 0;
         if (ret > 0) {
-            fwrite(buffer, 1, ret, stdout);
-            printf("\n");
-            fflush(stdout);
+	    ipcclient_write(ipcclient_fd, buffer, ret);
         }
     }
 
@@ -57,11 +56,11 @@ static void* write_thread(void* arg) {
     int ret = 0;
 
     while (ret >= 0) {
-        char    buffer[16384];
-        char *line = fgets(buffer, sizeof(buffer), stdin);
-        if (!line || !sDevice)
-            break;
-        ret = usb_device_bulk_transfer(sDevice, endpoint, line, strlen(line), 1000);
+        char buffer[16384];
+	int rsize = ipcclient_read(ipcclient_fd, buffer, sizeof(buffer));
+	if (rsize < 0)
+	    break;
+        ret = usb_device_bulk_transfer(sDevice, endpoint, buffer, rsize, 1000);
     }
 
     return NULL;
@@ -154,11 +153,11 @@ static int usb_device_added(const char *devname, void* client_data) {
             else
                 fprintf(stderr, "failed to read protocol version\n");
 
-            send_string(device, ACCESSORY_STRING_MANUFACTURER, "Google, Inc.");
-            send_string(device, ACCESSORY_STRING_MODEL, "AccessoryChat");
-            send_string(device, ACCESSORY_STRING_DESCRIPTION, "Accessory Chat");
+            send_string(device, ACCESSORY_STRING_MANUFACTURER, "LeapMotion, Inc.");
+            send_string(device, ACCESSORY_STRING_MODEL, "Spider");
+            send_string(device, ACCESSORY_STRING_DESCRIPTION, "AOAProxy");
             send_string(device, ACCESSORY_STRING_VERSION, "1.0");
-            send_string(device, ACCESSORY_STRING_URI, "http://www.android.com");
+            send_string(device, ACCESSORY_STRING_URI, "http://www.leapmotion.com");
             send_string(device, ACCESSORY_STRING_SERIAL, "1234567890");
 
             ret = usb_device_control_transfer(device, USB_DIR_OUT | USB_TYPE_VENDOR,
@@ -185,6 +184,12 @@ static int usb_device_removed(const char *devname, void* client_data) {
 
 
 int main(int argc, char* argv[]) {
+    ipcclient_fd = ipcclient_connect();
+    if (ipcclient_fd < 0) {
+        fprintf(stderr, "ipcclient connect failed");
+        return 1;
+    }
+
     struct usb_host_context* context = usb_host_init();
     if (!context) {
         fprintf(stderr, "usb_host_init failed");
