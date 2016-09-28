@@ -17,6 +17,7 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 public class RelayService extends Service {
 
@@ -45,7 +46,7 @@ public class RelayService extends Service {
     private Thread mIPCServerThread;
 
     private LocalServerSocket mServer;
-    private LocalSocket mClient;
+    private List<LocalSocket> mClients;
 
     @Override
     public void onCreate() {
@@ -170,7 +171,10 @@ public class RelayService extends Service {
                             if (ret > 0) {
                                 String text = new String(buffer, 0, ret);
                                 Log.d(TAG, "Received from usb host: " + text);
-                                mClient.getOutputStream().write(buffer, 0, ret);
+                                for (LocalSocket client : mClients) {
+                                    client.getOutputStream().write(buffer, 0, ret);
+                                    Log.d(TAG, "Sending to a client: " + text);
+                                }
                             }
                         }
                     } catch (IOException e) {
@@ -217,19 +221,42 @@ public class RelayService extends Service {
             public void run() {
                 try {
                     mServer = new LocalServerSocket(SOCKET_ADDRESS);
-                    mClient = mServer.accept();
-                    int ret = 0;
-                    // FIXME: need to check if the buffer size is correct
-                    byte[] buffer = new byte[16384];
-                    while (ret >= 0) {
-                        ret = mClient.getInputStream().read(buffer);
-                        if (ret > 0) {
-                            String text = new String(buffer, 0, ret);
-                            Log.d(TAG, "Send to usb host: " + text);
-                            mOutputStream.write(buffer, 0, ret);
-                        }
+                    Log.d(TAG, "Created LocalServerSocket with address " + SOCKET_ADDRESS);
+                    while (true) {
+                        final LocalSocket socket = mServer.accept();
+                        mClients.add(socket);
+                        Thread clientThread = new Thread(new Runnable() {
+                            LocalSocket client = socket;
+                            @Override
+                            public void run() {
+                                try {
+                                    int ret = 0;
+                                    // FIXME: need to check if the buffer size is correct
+                                    byte[] buffer = new byte[16384];
+                                    while (ret >= 0) {
+                                        ret = client.getInputStream().read(buffer);
+                                        if (ret > 0) {
+                                            String text = new String(buffer, 0, ret);
+                                            Log.d(TAG, "Send to usb host: " + text);
+                                            mOutputStream.write(buffer, 0, ret);
+                                        }
+                                    }
+                                } catch (IOException e) {
+                                    Log.d(TAG, "Caught IOException in client thread buffer reading");
+                                    e.printStackTrace();
+                                }
+                                try {
+                                    client.close();
+                                    mClients.remove(client);
+                                } catch (IOException e) {
+                                    Log.d(TAG, "Caught IOException on close/remove");
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
                     }
                 } catch (IOException e) {
+                    Log.d(TAG, "Caught IOException on LocalServerSocket create/accept");
                     e.printStackTrace();
                 }
             }
