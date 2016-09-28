@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbAccessory;
 import android.hardware.usb.UsbManager;
+import android.net.LocalServerSocket;
+import android.net.LocalSocket;
 import android.os.ParcelFileDescriptor;
 import android.os.IBinder;
 import android.util.Log;
@@ -24,6 +26,8 @@ public class RelayService extends Service {
 
     private static final String ACTION_USB_PERMISSION = "com.leapmotion.leapdaemon.action.USB_PERMISSION";
 
+    private static final String SOCKET_ADDRESS = "/data/data/com.leapmotion.leapdaemon/Leap Service";
+
     private ParcelFileDescriptor mFileDescriptor;
     private FileInputStream mInputStream;
     private FileOutputStream mOutputStream;
@@ -39,6 +43,9 @@ public class RelayService extends Service {
 
     private Thread mAccessoryRevMsgThread;
     private Thread mIPCServerThread;
+
+    private LocalServerSocket mServer;
+    private LocalSocket mClient;
 
     @Override
     public void onCreate() {
@@ -155,18 +162,19 @@ public class RelayService extends Service {
             mAccessoryRevMsgThread = new Thread() {
                 @Override
                 public void run() {
-                    int ret = 0;
-                    byte[] buffer = new byte[16384];
-                    while (ret >= 0) {
-                        try {
+                    try {
+                        int ret = 0;
+                        byte[] buffer = new byte[16384];
+                        while (ret >= 0) {
                             ret = mInputStream.read(buffer);
-                        } catch (IOException e) {
-                            break;
+                            if (ret > 0) {
+                                String text = new String(buffer, 0, ret);
+                                Log.d(TAG, "Received from usb host: " + text);
+                                mClient.getOutputStream().write(buffer, 0, ret);
+                            }
                         }
-                        if (ret > 0) {
-                            String text = new String(buffer, 0, ret);
-                            Log.d(TAG, "Received: " + text);
-                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
             };
@@ -200,18 +208,6 @@ public class RelayService extends Service {
         sendBroadcast(mBroadcastIntent);
     }
 
-    public boolean send(byte[] msg) {
-        if (mOutputStream != null) {
-            try {
-                mOutputStream.write(msg);
-            } catch (IOException e) {
-                Log.e(TAG, "write failed", e);
-            }
-            return true;
-        }
-        return false;
-    }
-
     void startIPCServer() {
         Log.v(TAG, "start IPCServer");
         if (mIsIPCServerRunning)
@@ -219,7 +215,23 @@ public class RelayService extends Service {
         mIPCServerThread = new Thread() {
             @Override
             public void run() {
-                // IPC Server
+                try {
+                    mServer = new LocalServerSocket(SOCKET_ADDRESS);
+                    mClient = mServer.accept();
+                    int ret = 0;
+                    // FIXME: need to check if the buffer size is correct
+                    byte[] buffer = new byte[16384];
+                    while (ret >= 0) {
+                        ret = mClient.getInputStream().read(buffer);
+                        if (ret > 0) {
+                            String text = new String(buffer, 0, ret);
+                            Log.d(TAG, "Send to usb host: " + text);
+                            mOutputStream.write(buffer, 0, ret);
+                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         };
         mIPCServerThread.start();
@@ -231,7 +243,11 @@ public class RelayService extends Service {
         if (!mIsIPCServerRunning)
             return;
 
-        // stop IPCServer
+        try {
+            mServer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         if (mIPCServerThread != null) {
             try {
