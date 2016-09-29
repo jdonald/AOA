@@ -224,6 +224,7 @@ public class RelayService extends Service {
                     Log.d(TAG, "Created LocalServerSocket with address " + SOCKET_ADDRESS);
                     while (true) {
                         final LocalSocket socket = mServer.accept();
+                        Log.d(TAG, "Accepted client LocalSocket");
                         mClients.add(socket);
                         Thread clientThread = new Thread(new Runnable() {
                             LocalSocket client = socket;
