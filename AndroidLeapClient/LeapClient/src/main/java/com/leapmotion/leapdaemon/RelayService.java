@@ -18,6 +18,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.ArrayList;
 
 public class RelayService extends Service {
 
@@ -27,7 +28,7 @@ public class RelayService extends Service {
 
     private static final String ACTION_USB_PERMISSION = "com.leapmotion.leapdaemon.action.USB_PERMISSION";
 
-    private static final String SOCKET_ADDRESS = "/data/data/com.leapmotion.leapdaemon/Leap Service";
+    private static final String SOCKET_ADDRESS = "MyBindName";
 
     private ParcelFileDescriptor mFileDescriptor;
     private FileInputStream mInputStream;
@@ -71,6 +72,7 @@ public class RelayService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.v(TAG, "onStartCommand");
+        MainActivity.activity.log("onStartCommand");
         startIPCServer();
         return START_STICKY;
     }
@@ -122,6 +124,7 @@ public class RelayService extends Service {
                     UsbAccessory accessory = (UsbAccessory) intent.getParcelableExtra(UsbManager.EXTRA_ACCESSORY);
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         Log.v(TAG, "permission granted for accessory" + accessory);
+                        MainActivity.activity.log("permission granted for accessory" + accessory);
                         mIsAccessoryPermitted = true;
                         if (accessory != null) {
                             openAccessory(accessory);
@@ -129,6 +132,7 @@ public class RelayService extends Service {
                     } else {
                         mIsAccessoryPermitted = false;
                         Log.d(TAG, "permission denied for accessory " + accessory);
+                        MainActivity.activity.log("permission denied for accessory " + accessory);
                     }
                     mPermissionRequestPending = false;
                     sendBroadcast(mBroadcastIntent);
@@ -154,6 +158,7 @@ public class RelayService extends Service {
 
     private void openAccessory(UsbAccessory accessory) {
         Log.d(TAG, "openAccessory: " + accessory);
+        MainActivity.activity.log("openAccessory: " + accessory);
         mFileDescriptor = mUsbManager.openAccessory(accessory);
         mIsAccessoryOpen = mFileDescriptor != null;
         if (mIsAccessoryOpen) {
@@ -171,9 +176,11 @@ public class RelayService extends Service {
                             if (ret > 0) {
                                 String text = new String(buffer, 0, ret);
                                 Log.d(TAG, "Received from usb host: " + text);
+                                MainActivity.activity.log("Received from usb host: " + text);
                                 for (LocalSocket client : mClients) {
                                     client.getOutputStream().write(buffer, 0, ret);
                                     Log.d(TAG, "Sending to a client: " + text);
+                                    MainActivity.activity.log("Sending to a client: " + text);
                                 }
                             }
                         }
@@ -184,8 +191,10 @@ public class RelayService extends Service {
             };
             mAccessoryRevMsgThread.start();
             Log.d(TAG, "openAccessory succeeded");
+            MainActivity.activity.log("openAccessory succeeded");
         } else {
             Log.d(TAG, "openAccessory fail");
+            MainActivity.activity.log("openAccessory fail");
         }
         sendBroadcast(mBroadcastIntent);
     }
@@ -219,12 +228,15 @@ public class RelayService extends Service {
         mIPCServerThread = new Thread() {
             @Override
             public void run() {
+                mClients = new ArrayList<LocalSocket>();
                 try {
                     mServer = new LocalServerSocket(SOCKET_ADDRESS);
                     Log.d(TAG, "Created LocalServerSocket with address " + SOCKET_ADDRESS);
+                    MainActivity.activity.log("Created LocalServerSocket with address " + SOCKET_ADDRESS);
                     while (true) {
                         final LocalSocket socket = mServer.accept();
                         Log.d(TAG, "Accepted client LocalSocket");
+                        MainActivity.activity.log("Accepted client LocalSocket");
                         mClients.add(socket);
                         Thread clientThread = new Thread(new Runnable() {
                             LocalSocket client = socket;
@@ -244,6 +256,7 @@ public class RelayService extends Service {
                                     }
                                 } catch (IOException e) {
                                     Log.d(TAG, "Caught IOException in client thread buffer reading");
+                                    Log.d(TAG, e.getStackTrace().toString());
                                     e.printStackTrace();
                                 }
                                 try {
@@ -251,6 +264,7 @@ public class RelayService extends Service {
                                     mClients.remove(client);
                                 } catch (IOException e) {
                                     Log.d(TAG, "Caught IOException on close/remove");
+                                    Log.d(TAG, e.getStackTrace().toString());
                                     e.printStackTrace();
                                 }
                             }
@@ -258,6 +272,8 @@ public class RelayService extends Service {
                     }
                 } catch (IOException e) {
                     Log.d(TAG, "Caught IOException on LocalServerSocket create/accept");
+                    Log.d(TAG, e.getStackTrace().toString());
+                    MainActivity.activity.log(e.getStackTrace().toString());
                     e.printStackTrace();
                 }
             }
