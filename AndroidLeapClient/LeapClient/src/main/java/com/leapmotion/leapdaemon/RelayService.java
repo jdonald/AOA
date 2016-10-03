@@ -31,8 +31,8 @@ public class RelayService extends Service {
     private static final String SOCKET_ADDRESS = "MyBindName";
 
     private ParcelFileDescriptor mFileDescriptor;
-    private FileInputStream mInputStream;
-    private FileOutputStream mOutputStream;
+    private FileInputStream mInputStream = null;
+    private FileOutputStream mOutputStream = null;
 
     private UsbManager mUsbManager;
     private PendingIntent mPermissionIntent;
@@ -165,6 +165,17 @@ public class RelayService extends Service {
                 @Override
                 public void run() {
                     try {
+                        while (mClients.size() == 0) {
+                            Log.d(TAG, "sleeping half a second while waiting for clients to accept");
+                            try {
+                               Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                               e.printStackTrace();
+                               Log.d(TAG, "InterruptedException");
+                               Log.d(TAG, e.getStackTrace().toString());
+                            }
+
+                        }
                         int ret = 0;
                         byte[] buffer = new byte[16384];
                         while (ret >= 0) {
@@ -232,6 +243,16 @@ public class RelayService extends Service {
                             LocalSocket client = socket;
                             @Override
                             public void run() {
+                                while (mOutputStream == null) {
+                                    Log.d(TAG, "sleeping half a second while waiting for AOA to connect");
+                                    try {
+                                        Thread.sleep(500);
+                                    } catch (InterruptedException e) {
+                                        e.printStackTrace();
+                                        Log.d(TAG, "InterruptedException");
+                                        Log.d(TAG, e.getStackTrace().toString());
+                                    }
+                                }
                                 try {
                                     int ret = 0;
                                     // FIXME: need to check if the buffer size is correct

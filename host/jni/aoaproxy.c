@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -44,7 +45,10 @@ static void* read_thread(void* arg) {
         if (ret < 0 && errno == ETIMEDOUT)
             ret = 0;
         if (ret > 0) {
-	    ipcclient_write(ipcclient_fd, buffer, ret);
+            assert(ret < 16384);
+            buffer[ret] = '\0';
+            printf("got %d bytes coming into daemon: %s\n", ret, buffer);
+            ipcclient_write(ipcclient_fd, buffer, ret);
         }
     }
 
@@ -57,9 +61,12 @@ static void* write_thread(void* arg) {
 
     while (ret >= 0) {
         char buffer[16384];
-	int rsize = ipcclient_read(ipcclient_fd, buffer, sizeof(buffer));
-	if (rsize < 0)
-	    break;
+        int rsize = ipcclient_read(ipcclient_fd, buffer, sizeof(buffer));
+        if (rsize < 0)
+            break;
+        assert(ret < 16384);
+        buffer[ret] = '\0';
+        printf("got %d bytes from daemon to send to AOA: %s\n", ret, buffer);
         ret = usb_device_bulk_transfer(sDevice, endpoint, buffer, rsize, 1000);
     }
 
