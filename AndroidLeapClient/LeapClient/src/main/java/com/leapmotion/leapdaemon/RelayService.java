@@ -28,7 +28,7 @@ public class RelayService extends Service {
 
     private static final String ACTION_USB_PERMISSION = "com.leapmotion.leapdaemon.action.USB_PERMISSION";
 
-    private static final String SOCKET_ADDRESS = "MyBindName";
+    private static final String SOCKET_ADDRESS = "/data/data/com.leapmotion.leapdaemon/Leap Service";
 
     private ParcelFileDescriptor mFileDescriptor;
     private FileInputStream mInputStream = null;
