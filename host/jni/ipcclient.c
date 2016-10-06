@@ -33,11 +33,19 @@ int ipcclient_connect() {
 }
 
 int ipcclient_write(int fd, const void* pBuf, size_t nBytes) {
-  return (nBytes == send(fd, pBuf, nBytes, MSG_NOSIGNAL));
+  if (nBytes != send(fd, pBuf, nBytes, MSG_NOSIGNAL)) {
+      perror("client write()");
+      return -1;
+  }
+  return 0;
 }
 
 size_t ipcclient_read(int fd, void* pBuf, size_t nBytes) {
-  return recv(fd, pBuf, nBytes, MSG_NOSIGNAL);
+  size_t rsize = recv(fd, pBuf, nBytes, MSG_NOSIGNAL);
+  if (rsize < 0) {
+      perror("client read()");
+  }
+  return rsize;
 }
 
 /*

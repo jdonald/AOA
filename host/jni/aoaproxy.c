@@ -32,7 +32,7 @@
 #include "ipcclient.h"
 
 struct usb_device *sDevice = NULL;
-int ipcclient_fd;
+int ipcclient_fd = -1;
 
 static void* read_thread(void* arg) {
     int endpoint = (int)(uintptr_t)arg;
@@ -61,13 +61,13 @@ static void* write_thread(void* arg) {
 
     while (ret >= 0) {
         char buffer[16384];
-        int rsize = ipcclient_read(ipcclient_fd, buffer, sizeof(buffer));
-        if (rsize < 0)
-            break;
-        assert(ret < 16384);
-        buffer[ret] = '\0';
-        printf("got %d bytes from daemon to send to AOA: %s\n", ret, buffer);
-        ret = usb_device_bulk_transfer(sDevice, endpoint, buffer, rsize, 1000);
+        ret = ipcclient_read(ipcclient_fd, buffer, sizeof(buffer));
+	if (ret > 0) {
+            assert(ret < 16384);
+            buffer[ret] = '\0';
+            printf("got %d bytes from daemon to send to AOA: %s\n", ret, buffer);
+            usb_device_bulk_transfer(sDevice, endpoint, buffer, ret, 1000);
+	}
     }
 
     return NULL;
