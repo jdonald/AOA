@@ -16,6 +16,7 @@ import android.widget.TextView;
 public class MainActivity extends Activity {
 
     private static final String TAG = "LeapClient";
+    public static MainActivity activity;
 
     private TextView mLog;
 
@@ -25,6 +26,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        activity = this;
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.leap_client);
@@ -62,7 +64,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    private void log(String msg) {
+    public void log(String msg) {
         mLog.setText(mLog.getText() + "\n" + msg);
     }
 
