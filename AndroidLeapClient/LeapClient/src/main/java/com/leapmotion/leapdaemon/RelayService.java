@@ -234,57 +234,60 @@ public class RelayService extends Service {
                 mClients = new ArrayList<LocalSocket>();
                 try {
                     mServer = new LocalServerSocket(SOCKET_ADDRESS);
-                    Log.d(TAG, "Created LocalServerSocket with address " + SOCKET_ADDRESS);
-                    while (true) {
-                        final LocalSocket socket = mServer.accept();
-                        Log.d(TAG, "Accepted client LocalSocket");
-                        mClients.add(socket);
-                        Thread clientThread = new Thread(new Runnable() {
-                            LocalSocket client = socket;
-                            @Override
-                            public void run() {
-                                while (mOutputStream == null) {
-                                    Log.d(TAG, "sleeping half a second while waiting for AOA to connect");
-                                    try {
-                                        Thread.sleep(500);
-                                    } catch (InterruptedException e) {
-                                        e.printStackTrace();
-                                        Log.d(TAG, "InterruptedException");
-                                        Log.d(TAG, e.getStackTrace().toString());
-                                    }
-                                }
-                                try {
-                                    int ret = 0;
-                                    // FIXME: need to check if the buffer size is correct
-                                    byte[] buffer = new byte[16384];
-                                    while (ret >= 0) {
-                                        ret = client.getInputStream().read(buffer);
-                                        if (ret > 0) {
-                                            String text = new String(buffer, 0, ret);
-                                            Log.d(TAG, "Send to usb host: " + text);
-                                            mOutputStream.write(buffer, 0, ret);
-                                        }
-                                    }
-                                } catch (IOException e) {
-                                    Log.d(TAG, "Caught IOException in client thread buffer reading");
-                                    Log.d(TAG, e.getStackTrace().toString());
-                                    e.printStackTrace();
-                                }
-                                try {
-                                    client.close();
-                                    mClients.remove(client);
-                                } catch (IOException e) {
-                                    Log.d(TAG, "Caught IOException on close/remove");
-                                    Log.d(TAG, e.getStackTrace().toString());
-                                    e.printStackTrace();
-                                }
-                            }
-                        });
-                    }
                 } catch (IOException e) {
-                    Log.d(TAG, "Caught IOException on LocalServerSocket create/accept");
+                    Log.d(TAG, "Caught IOException on LocalServerSocket create");
                     Log.d(TAG, e.getStackTrace().toString());
                     e.printStackTrace();
+                }
+                while (true) {
+                    LocalSocket client = null;
+                    try {
+                        client = mServer.accept();
+                    } catch (IOException e) {
+                        Log.d(TAG, "Caught IOException on LocalServerSocket accept");
+                        Log.d(TAG, e.getStackTrace().toString());
+                        e.printStackTrace();
+                    }
+                    Log.d(TAG, "Accepted client LocalSocket");
+                    mClients.add(client);
+
+                    while (mOutputStream == null) {
+                        Log.d(TAG, "sleeping half a second while waiting for AOA to connect");
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                            Log.d(TAG, "InterruptedException");
+                            Log.d(TAG, e.getStackTrace().toString());
+                        }
+                    }
+
+                    try {
+                        int ret = 0;
+                        // FIXME: need to check if the buffer size is correct
+                        byte[] buffer = new byte[16384];
+                        while (ret >= 0) {
+                            ret = client.getInputStream().read(buffer);
+                            if (ret > 0) {
+                                String text = new String(buffer, 0, ret);
+                                Log.d(TAG, "Send to usb host: " + text);
+                                mOutputStream.write(buffer, 0, ret);
+                            }
+                        }
+                    } catch (IOException e) {
+                        Log.d(TAG, "Caught IOException in client thread buffer reading");
+                        Log.d(TAG, e.getStackTrace().toString());
+                        e.printStackTrace();
+                    }
+
+                    try {
+                        client.close();
+                    } catch (IOException e) {
+                        Log.d(TAG, "Caught IOException on close/remove");
+                        Log.d(TAG, e.getStackTrace().toString());
+                        e.printStackTrace();
+                    }
+                    mClients.remove(client);
                 }
             }
         };
